@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sunbelt Rentals - Expert Load Planning System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        sunbelt: {
+                            DEFAULT: '#00833B',
+                            dark: '#00662e',
+                            light: '#e5f3ec',
+                            accent: '#FFCD00'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #f1f5f9;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* Responsive workspace canvas container styling */
+        .workspace-viewport {
+            background-image: 
+                linear-gradient(to right, rgba(0,0,0,0.05) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(0,0,0,0.05) 1px, transparent 1px);
+            background-size: 24px 24px;
+        }
+
+        .trailer-deck {
+            background-color: #18181b;
+            background-image: 
+                linear-gradient(to right, rgba(255,255,255,0.08) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255,255,255,0.08) 1px, transparent 1px);
+            background-size: 16px 16px; /* 1 foot = 16 pixels for optimal screen scaling on long beds */
+            border: 4px solid #d4d4d8;
+            border-left-width: 8px;
+            box-shadow: 0 20px 30px -10px rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(0,0,0,0.8);
+            position: relative;
+            transition: width 0.25s ease, height 0.25s ease;
+        }
+
+        .cargo-item {
+            position: absolute;
+            cursor: grab;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+            border: 2px solid rgba(0,0,0,0.5);
+            border-radius: 4px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            transition: filter 0.15s ease;
+        }
+
+        .cargo-item:hover {
+            filter: brightness(1.1);
+        }
+
+        .cargo-item:active {
+            cursor: grabbing;
+            z-index: 100 !important;
+            box-shadow: 0 15px 25px rgba(0, 0, 0, 0.6);
+        }
+
+        .cargo-label {
+            font-weight: 800;
+            color: white;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.9);
+            pointer-events: none;
+            padding: 0 4px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            width: 100%;
+        }
+
+        .stripe-pattern {
+            background-image: repeating-linear-gradient(
+                45deg,
+                rgba(255, 255, 255, 0.1),
+                rgba(255, 255, 255, 0.1) 8px,
+                transparent 8px,
+                transparent 16px
+            );
+        }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #e2e8f0; }
+        ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+    </style>
+</head>
+<body class="text-zinc-800 h-screen w-full flex">
+
+    <!-- LEFT SIDEBAR: Controls & Equipment Library -->
+    <div class="w-80 bg-white border-r border-zinc-200 shadow-xl flex flex-col z-20 shrink-0">
+        
+        <!-- Header Brand -->
+        <div class="p-4 bg-sunbelt text-white border-b border-sunbelt-dark shadow-inner">
+            <h1 class="text-lg font-extrabold flex items-center gap-2 tracking-tight">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-sunbelt-accent"><path d="M10 17h4V5H2v12h3"/><path d="M20 17h2v-3.34a4 4 0 0 0-1.17-2.83L19 9h-5"/><path d="M14 17h1"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>
+                LOAD PLANNER PRO
+            </h1>
+            <p class="text-[11px] text-sunbelt-light mt-0.5 font-medium opacity-95">Sunbelt Rentals Fleet Logistics</p>
+        </div>
+        
+        <!-- CARRIER / TRAILER SELECTORS -->
+        <div class="p-3 bg-zinc-100 border-b border-zinc-200 space-y-2.5">
+            <div>
+                <label for="standard-trailer-select" class="block text-[10px] font-bold uppercase tracking-wider text-zinc-600 mb-1">Standard Trailers</label>
+                <select id="standard-trailer-select" onchange="switchCarrier('standard', this.value)" class="w-full bg-white border border-zinc-300 rounded p-1.5 text-xs font-bold text-zinc-800 shadow-sm focus:ring-2 focus:ring-sunbelt outline-none">
+                    <!-- Populated via JS -->
+                </select>
+            </div>
+
+            <div>
+                <label for="landoll-carrier-select" class="block text-[10px] font-bold uppercase tracking-wider text-zinc-600 mb-1">Specialty Trucks & Landolls</label>
+                <select id="landoll-carrier-select" onchange="switchCarrier('landoll', this.value)" class="w-full bg-white border border-zinc-300 rounded p-1.5 text-xs font-bold text-zinc-800 shadow-sm focus:ring-2 focus:ring-sunbelt outline-none">
+                    <!-- Populated via JS -->
+                </select>
+            </div>
+
+            <div id="carrier-specs-badge" class="pt-1 text-[11px] text-zinc-600 font-bold flex justify-between border-t border-zinc-200">
+                <!-- Specs loaded dynamically -->
+            </div>
+        </div>
+
+        <!-- EQUIPMENT CATALOG -->
+        <div class="p-2.5 bg-zinc-50 border-b border-zinc-200 flex justify-between items-center">
+            <span class="text-xs font-extrabold uppercase tracking-wider text-zinc-700">Equipment Catalog</span>
+            <span class="text-[10px] text-zinc-400 font-semibold">Click to auto-space</span>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-3 space-y-2.5" id="equipment-list">
+            <!-- Equipment injected by JS -->
+        </div>
+    </div>
+
+    <!-- RIGHT MAIN CONTENT AREA -->
+    <div class="flex-1 flex flex-col bg-zinc-100 relative overflow-hidden">
+        
+        <!-- TOP METRICS DASHBOARD -->
+        <div class="bg-white px-6 py-3 border-b border-zinc-200 shadow-sm z-20 flex items-center justify-between shrink-0 gap-6">
+            
+            <div class="flex flex-1 gap-6 max-w-4xl">
+                
+                <!-- WEIGHT METER -->
+                <div class="flex flex-col flex-1">
+                    <div class="flex justify-between items-end mb-1">
+                        <div>
+                            <span class="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Payload Weight</span>
+                            <div class="text-xl font-black text-zinc-800 flex items-baseline gap-1.5">
+                                <span id="current-weight">0</span> 
+                                <span id="max-weight-label" class="text-xs text-zinc-400 font-semibold">/ 70k lbs</span>
+                            </div>
+                        </div>
+                        <div id="overweight-warning" class="hidden items-center gap-1 px-2 py-0.5 bg-red-100 border border-red-300 text-red-700 rounded text-[10px] font-bold animate-pulse">
+                            OVERWEIGHT
+                        </div>
+                    </div>
+                    <div class="w-full h-2 bg-zinc-100 rounded-full overflow-hidden border border-zinc-200">
+                        <div id="weight-bar" class="h-full bg-sunbelt transition-all duration-300" style="width: 0%;"></div>
+                    </div>
+                    <div class="flex justify-between mt-0.5 text-[10px] font-bold text-zinc-500 uppercase">
+                        <span id="utilization-text">0% Used</span>
+                        <span id="remaining-text">70k lbs Left</span>
+                    </div>
+                </div>
+
+                <!-- LENGTH METER -->
+                <div class="flex flex-col flex-1">
+                    <div class="flex justify-between items-end mb-1">
+                        <div>
+                            <span class="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Deck Length Footprint</span>
+                            <div class="text-xl font-black text-zinc-800 flex items-baseline gap-1.5">
+                                <span id="current-length">0.0</span> 
+                                <span id="max-length-label" class="text-xs text-zinc-400 font-semibold">/ 51 ft</span>
+                            </div>
+                        </div>
+                        <div id="overlength-warning" class="hidden items-center gap-1 px-2 py-0.5 bg-red-100 border border-red-300 text-red-700 rounded text-[10px] font-bold animate-pulse">
+                            DECK FULL
+                        </div>
+                    </div>
+                    <div class="w-full h-2 bg-zinc-100 rounded-full overflow-hidden border border-zinc-200">
+                        <div id="length-bar" class="h-full bg-sunbelt transition-all duration-300" style="width: 0%;"></div>
+                    </div>
+                    <div class="flex justify-between mt-0.5 text-[10px] font-bold text-zinc-500 uppercase">
+                        <span id="length-utilization-text">0% Space</span>
+                        <span id="length-remaining-text">51 ft Left</span>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Clear Button -->
+            <div>
+                <button onclick="clearDeck()" class="px-3.5 py-2 bg-zinc-800 hover:bg-black text-white rounded font-bold text-xs uppercase tracking-wider transition-colors flex items-center gap-1.5 shadow-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                    Clear Deck
+                </button>
+            </div>
+        </div>
+
+        <!-- SCROLLABLE WORKSPACE FOR TRAILER DECK & RULERS -->
+        <div class="flex-1 workspace-viewport overflow-auto p-12 flex items-center justify-center relative">
+            
+            <!-- Trailer Outer Frame Container ensuring fully visible dimensions -->
+            <div class="relative pl-14 pt-12 pb-12 pr-14" id="trailer-frame">
+                
+                <!-- TOP LENGTH RULER -->
+                <div id="top-length-ruler" class="absolute top-0 left-14 right-14 h-8 flex items-center justify-center">
+                    <div class="w-full border-t-2 border-zinc-400 relative flex items-center justify-center">
+                        <div class="absolute bg-white px-3 py-0.5 rounded text-[11px] font-black text-zinc-700 tracking-widest border border-zinc-300 shadow-sm" id="length-ruler-text">
+                            LENGTH RULER
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LEFT WIDTH RULER -->
+                <div id="left-width-ruler" class="absolute left-0 top-12 bottom-12 w-12 flex items-center justify-center">
+                    <div class="h-full border-l-2 border-zinc-400 relative flex items-center justify-center">
+                        <div class="absolute bg-sunbelt-accent px-2 py-0.5 rounded text-[11px] font-black text-zinc-900 tracking-widest border border-yellow-500 shadow-md -rotate-90 whitespace-nowrap" id="width-ruler-text">
+                            WIDTH
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TRAILER DECK ELEMENT -->
+                <div id="trailer-deck" class="trailer-deck rounded-sm">
+                    <!-- Empty State Notice -->
+                    <div id="empty-notice" class="absolute inset-0 flex flex-col items-center justify-center text-zinc-400 pointer-events-none">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="mb-2 text-zinc-500"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+                        <p class="font-bold uppercase tracking-wider text-xs text-zinc-400">Trailer deck is empty. Select equipment on the left.</p>
+                    </div>
+                </div>
+
+                <!-- Wheels (Visual Decoration) -->
+                <div class="absolute -bottom-2 right-24 w-32 h-5 bg-zinc-900 rounded-full flex justify-between px-2 items-center shadow-lg border border-zinc-700">
+                    <div class="w-7 h-7 rounded-full bg-zinc-800 border-2 border-zinc-600"></div>
+                    <div class="w-7 h-7 rounded-full bg-zinc-800 border-2 border-zinc-600"></div>
+                </div>
+                <div class="absolute -top-2 right-24 w-32 h-5 bg-zinc-900 rounded-full flex justify-between px-2 items-center shadow-lg border border-zinc-700">
+                    <div class="w-7 h-7 rounded-full bg-zinc-800 border-2 border-zinc-600"></div>
+                    <div class="w-7 h-7 rounded-full bg-zinc-800 border-2 border-zinc-600"></div>
+                </div>
+                <!-- Hitch (Visual Decoration) -->
+                <div class="absolute top-1/2 -left-10 -translate-y-1/2 w-10 h-5 bg-zinc-800 rounded-l border-y border-l border-zinc-600 flex items-center">
+                    <div class="w-3 h-7 bg-zinc-900 rounded-l-full -ml-1 border border-zinc-700"></div>
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <script>
+        // --- DATA & CONFIGURATIONS ---
+        const STANDARD_TRAILERS = [
+            { id: 'flatbed-48', name: '48ft Standard Flatbed', length: 48, width: 8.5, maxWeight: 45000 },
+            { id: 'stepdeck-53', name: '53ft Step Deck Trailer', length: 53, width: 8.5, maxWeight: 50000 },
+            { id: 'equip-40', name: '40ft Equipment Trailer', length: 40, width: 8.5, maxWeight: 30000 },
+            { id: 'tag-20', name: '20ft Tag-Along Trailer', length: 20, width: 8.0, maxWeight: 14000 }
+        ];
+
+        const LANDOLL_CARRIERS = [
+            { id: 'landoll-930e', name: 'Landoll 930E Traveling Tail', length: 51, width: 8.5, maxWeight: 70000 },
+            { id: 'landoll-440b', name: 'Landoll 440B Traveling Axle', length: 53, width: 8.5, maxWeight: 80000 }
+        ];
+
+        let activeCarrier = LANDOLL_CARRIERS[0]; // Default to Landoll 930E
+
+        const EQUIPMENT_CATALOG = [
+            { id: 'skid-steer', name: 'Skid Steer (Tracked)', length: 12, width: 6, weight: 8000, color: '#FFCD00', textColor: '#000000' },
+            { id: 'mini-excavator', name: 'Mini Excavator', length: 15, width: 6, weight: 10000, color: '#FFCD00', textColor: '#000000' },
+            { id: 'boom-lift', name: 'Articulating Boom Lift', length: 22, width: 7, weight: 15500, color: '#00833B', textColor: '#ffffff' },
+            { id: 'generator', name: '125kW Towable Generator', length: 10, width: 4, weight: 5500, color: '#3f3f46', textColor: '#ffffff' },
+            { id: 'light-tower', name: 'Mobile Light Tower', length: 9, width: 4, weight: 2800, color: '#00833B', textColor: '#ffffff' },
+            { id: 'forklift', name: 'Rough Terrain Forklift', length: 14, width: 7, weight: 9500, color: '#FFCD00', textColor: '#000000' },
+            { id: 'scissor-lift', name: 'Scissor Lift (19ft)', length: 8, width: 4, weight: 3300, color: '#00833B', textColor: '#ffffff' },
+            { id: 'roller', name: 'Trench Roller', length: 7, width: 3, weight: 3500, color: '#71717a', textColor: '#ffffff' },
+            { id: 'pallet', name: 'Heavy Palletized Cargo', length: 4, width: 4, weight: 2500, color: '#71717a', textColor: '#ffffff' }
+        ];
+
+        const PIXELS_PER_FOOT = 16; // Perfectly scaled for long trailers
+        let placedCargo = [];
+        let uniqueIdCounter = 0;
+
+        let draggingItem = null;
+        let dragTargetData = null;
+        let grabOffsetX = 0;
+        let grabOffsetY = 0;
+
+        // --- INITIALIZATION ---
+        function initApp() {
+            populateDropdowns();
+            renderEquipmentSidebar();
+            applyCarrierDimensions();
+            updateDashboardMetrics();
+
+            document.addEventListener('mousemove', onDocumentMouseMove);
+            document.addEventListener('mouseup', onDocumentMouseUp);
+            document.addEventListener('touchmove', onDocumentTouchMove, { passive: false });
+            document.addEventListener('touchend', onDocumentMouseUp);
+        }
+
+        function populateDropdowns() {
+            const stdSelect = document.getElementById('standard-trailer-select');
+            stdSelect.innerHTML = '<option value="">-- Choose Standard Trailer --</option>';
+            STANDARD_TRAILERS.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t.id;
+                opt.text = `${t.name} (${t.length}'L x ${t.width}'W)`;
+                stdSelect.appendChild(opt);
+            });
+
+            const landollSelect = document.getElementById('landoll-carrier-select');
+            landollSelect.innerHTML = '';
+            LANDOLL_CARRIERS.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.id;
+                opt.text = `${c.name} (${c.length}'L, ${c.maxWeight.toLocaleString()} lbs)`;
+                if (c.id === activeCarrier.id) opt.selected = true;
+                landollSelect.appendChild(opt);
+            });
+        }
+
+        function switchCarrier(category, carrierId) {
+            if (!carrierId) return;
+            let found = null;
+            if (category === 'standard') {
+                found = STANDARD_TRAILERS.find(t => t.id === carrierId);
+                document.getElementById('landoll-carrier-select').value = "";
+            } else {
+                found = LANDOLL_CARRIERS.find(c => c.id === carrierId);
+                document.getElementById('standard-trailer-select').value = "";
+            }
+
+            if (!found) return;
+            activeCarrier = found;
+            applyCarrierDimensions();
+
+            // Clamp existing cargo inside new bounds
+            placedCargo.forEach(item => {
+                const len = item.rotated ? item.template.width : item.template.length;
+                const wid = item.rotated ? item.template.length : item.template.width;
+                const maxX = (activeCarrier.length * PIXELS_PER_FOOT) - (len * PIXELS_PER_FOOT);
+                const maxY = (activeCarrier.width * PIXELS_PER_FOOT) - (wid * PIXELS_PER_FOOT);
+
+                if (item.x > maxX) item.x = Math.max(0, maxX);
+                if (item.y > maxY) item.y = Math.max(0, maxY);
+            });
+
+            renderCargoToDeck();
+            updateDashboardMetrics();
+        }
+
+        function applyCarrierDimensions() {
+            const deckEl = document.getElementById('trailer-deck');
+            const totalWidthPx = activeCarrier.length * PIXELS_PER_FOOT;
+            const totalHeightPx = activeCarrier.width * PIXELS_PER_FOOT;
+
+            deckEl.style.width = totalWidthPx + 'px';
+            deckEl.style.height = totalHeightPx + 'px';
+
+            document.getElementById('length-ruler-text').innerText = `${activeCarrier.length} FT LENGTH RULER`;
+            document.getElementById('width-ruler-text').innerText = `${activeCarrier.width} FT WIDTH`;
+            document.getElementById('carrier-specs-badge').innerHTML = `<span>Max: <b>${activeCarrier.maxWeight.toLocaleString()} lbs</b></span><span>Size: <b>${activeCarrier.length}'x${activeCarrier.width}'</b></span>`;
+            
+            document.getElementById('max-weight-label').innerText = `/ ${(activeCarrier.maxWeight / 1000).toFixed(0)}k lbs`;
+            document.getElementById('max-length-label').innerText = `/ ${activeCarrier.length} ft`;
+        }
+
+        function renderEquipmentSidebar() {
+            const listEl = document.getElementById('equipment-list');
+            listEl.innerHTML = '';
+
+            EQUIPMENT_CATALOG.forEach(eq => {
+                const card = document.createElement('div');
+                card.className = 'bg-white border border-zinc-200 rounded p-2.5 shadow-sm hover:border-sunbelt transition-colors flex flex-col gap-2 group';
+                card.innerHTML = `
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-10 h-10 rounded border border-zinc-200 flex-shrink-0 flex items-center justify-center font-bold text-xs shadow-sm" style="background-color: ${eq.color}; color: ${eq.textColor};">
+                            ${eq.length}'
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="font-bold text-zinc-800 text-xs truncate">${eq.name}</h3>
+                            <div class="text-[10px] font-semibold text-zinc-500 flex justify-between mt-0.5">
+                                <span>${eq.weight.toLocaleString()} lbs</span>
+                                <span>${eq.length}'L x ${eq.width}'W</span>
+                            </div>
+                        </div>
+                    </div>
+                    <button onclick="addEquipmentToDeck('${eq.id}')" class="w-full py-1.5 bg-zinc-100 group-hover:bg-sunbelt group-hover:text-white text-zinc-700 rounded font-bold text-[10px] uppercase tracking-wider transition-colors flex items-center justify-center gap-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+                        Add to Deck
+                    </button>
+                `;
+                listEl.appendChild(card);
+            });
+        }
+
+        function addEquipmentToDeck(eqId) {
+            const template = EQUIPMENT_CATALOG.find(e => e.id === eqId);
+            if (!template) return;
+
+            const itemLenPx = template.length * PIXELS_PER_FOOT;
+            const itemWidPx = template.width * PIXELS_PER_FOOT;
+
+            let startX = 10;
+            // Smart auto-spacing: Place to the right of the rightmost item
+            if (placedCargo.length > 0) {
+                let maxRight = 0;
+                placedCargo.forEach(item => {
+                    const l = item.rotated ? item.template.width : item.template.length;
+                    const rightEdge = item.x + (l * PIXELS_PER_FOOT);
+                    if (rightEdge > maxRight) maxRight = rightEdge;
+                });
+                startX = maxRight + 12;
+            }
+
+            let startY = ((activeCarrier.width * PIXELS_PER_FOOT) - itemWidPx) / 2;
+            const maxDeckLenPx = activeCarrier.length * PIXELS_PER_FOOT;
+
+            if (startX + itemLenPx > maxDeckLenPx) {
+                startX = Math.max(0, maxDeckLenPx - itemLenPx);
+            }
+
+            const newItem = {
+                instanceId: 'cargo_' + uniqueIdCounter++,
+                template: template,
+                x: startX,
+                y: Math.max(0, startY),
+                rotated: false
+            };
+
+            placedCargo.push(newItem);
+            renderCargoToDeck();
+            updateDashboardMetrics();
+        }
+
+        function removeCargoItem(instanceId) {
+            placedCargo = placedCargo.filter(i => i.instanceId !== instanceId);
+            renderCargoToDeck();
+            updateDashboardMetrics();
+        }
+
+        function rotateCargoItem(instanceId) {
+            const item = placedCargo.find(i => i.instanceId === instanceId);
+            if (!item) return;
+
+            item.rotated = !item.rotated;
+
+            const effLen = item.rotated ? item.template.width : item.template.length;
+            const effWid = item.rotated ? item.template.length : item.template.width;
+
+            const maxW = (activeCarrier.length * PIXELS_PER_FOOT) - (effLen * PIXELS_PER_FOOT);
+            const maxH = (activeCarrier.width * PIXELS_PER_FOOT) - (effWid * PIXELS_PER_FOOT);
+
+            if (item.x > maxW) item.x = Math.max(0, maxW);
+            if (item.y > maxH) item.y = Math.max(0, maxH);
+
+            renderCargoToDeck();
+            updateDashboardMetrics();
+        }
+
+        function clearDeck() {
+            if (placedCargo.length === 0) return;
+            placedCargo = [];
+            renderCargoToDeck();
+            updateDashboardMetrics();
+        }
+
+        function renderCargoToDeck() {
+            const deckEl = document.getElementById('trailer-deck');
+            deckEl.querySelectorAll('.cargo-item').forEach(el => el.remove());
+
+            document.getElementById('empty-notice').style.display = placedCargo.length === 0 ? 'flex' : 'none';
+
+            placedCargo.forEach(item => {
+                const len = item.rotated ? item.template.width : item.template.length;
+                const wid = item.rotated ? item.template.length : item.template.width;
+                const pxW = len * PIXELS_PER_FOOT;
+                const pxH = wid * PIXELS_PER_FOOT;
+
+                const div = document.createElement('div');
+                div.className = 'cargo-item stripe-pattern';
+                div.style.width = pxW + 'px';
+                div.style.height = pxH + 'px';
+                div.style.left = item.x + 'px';
+                div.style.top = item.y + 'px';
+                div.style.backgroundColor = item.template.color;
+                div.style.zIndex = 10;
+
+                let html = '';
+                if (pxW > 45 && pxH > 30) {
+                    html += `<span class="cargo-label text-[10px]" style="color: ${item.template.textColor}">${item.template.name}</span>`;
+                }
+
+                // Hover Actions Toolbar
+                html += `
+                    <div class="absolute -top-7 hidden group-hover:flex items-center gap-1 bg-zinc-900 text-white px-2 py-0.5 rounded shadow-lg z-30">
+                        <button onclick="event.stopPropagation(); rotateCargoItem('${item.instanceId}')" class="p-0.5 hover:text-sunbelt-accent transition-colors flex items-center gap-0.5 text-[9px] font-bold">ROTATE</button>
+                        <span class="text-zinc-600">|</span>
+                        <button onclick="event.stopPropagation(); removeCargoItem('${item.instanceId}')" class="p-0.5 hover:text-red-400 transition-colors flex items-center gap-0.5 text-[9px] font-bold">DEL</button>
+                    </div>
+                `;
+
+                div.innerHTML = html;
+                div.classList.add('group');
+
+                div.addEventListener('dblclick', (e) => {
+                    e.stopPropagation();
+                    removeCargoItem(item.instanceId);
+                });
+
+                div.addEventListener('mousedown', (e) => startDrag(e, div, item));
+                div.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    startDrag(e.touches[0], div, item);
+                }, { passive: false });
+
+                deckEl.appendChild(div);
+            });
+        }
+
+        function startDrag(e, element, itemData) {
+            draggingItem = { element, itemData };
+            const rect = element.getBoundingClientRect();
+            grabOffsetX = e.clientX - rect.left;
+            grabOffsetY = e.clientY - rect.top;
+            element.style.zIndex = 100;
+        }
+
+        function onDocumentMouseMove(e) { processDrag(e.clientX, e.clientY); }
+        function onDocumentTouchMove(e) {
+            if (draggingItem) {
+                e.preventDefault();
+                processDrag(e.touches[0].clientX, e.touches[0].clientY);
+            }
+        }
+
+        function processDrag(clientX, clientY) {
+            if (!draggingItem) return;
+
+            const deckRect = document.getElementById('trailer-deck').getBoundingClientRect();
+            let newX = clientX - deckRect.left - grabOffsetX;
+            let newY = clientY - deckRect.top - grabOffsetY;
+
+            const item = draggingItem.itemData;
+            const effLen = item.rotated ? item.template.width : item.template.length;
+            const effWid = item.rotated ? item.template.length : item.template.width;
+
+            const maxX = (activeCarrier.length * PIXELS_PER_FOOT) - (effLen * PIXELS_PER_FOOT);
+            const maxY = (activeCarrier.width * PIXELS_PER_FOOT) - (effWid * PIXELS_PER_FOOT);
+
+            newX = Math.max(0, Math.min(newX, maxX));
+            newY = Math.max(0, Math.min(newY, maxY));
+
+            draggingItem.element.style.left = newX + 'px';
+            draggingItem.element.style.top = newY + 'px';
+
+            item.x = newX;
+            item.y = newY;
+            updateDashboardMetrics();
+        }
+
+        function onDocumentMouseUp() {
+            if (draggingItem) {
+                draggingItem.element.style.zIndex = 10;
+                draggingItem = null;
+                updateDashboardMetrics();
+            }
+        }
+
+        function updateDashboardMetrics() {
+            let totalWeight = 0;
+            let maxRightPx = 0;
+
+            placedCargo.forEach(item => {
+                totalWeight += item.template.weight;
+                const len = item.rotated ? item.template.width : item.template.length;
+                const rightEdge = item.x + (len * PIXELS_PER_FOOT);
+                if (rightEdge > maxRightPx) maxRightPx = rightEdge;
+            });
+
+            // Weight Calculations
+            document.getElementById('current-weight').innerText = totalWeight.toLocaleString();
+            const weightUtil = Math.min((totalWeight / activeCarrier.maxWeight) * 100, 100);
+            const weightRem = activeCarrier.maxWeight - totalWeight;
+            const isOverweight = totalWeight > activeCarrier.maxWeight;
+
+            const weightBar = document.getElementById('weight-bar');
+            weightBar.style.width = weightUtil + '%';
+            document.getElementById('utilization-text').innerText = `${weightUtil.toFixed(1)}% Used`;
+            const remText = document.getElementById('remaining-text');
+
+            if (isOverweight) {
+                remText.innerText = `${Math.abs(weightRem).toLocaleString()} lbs OVER`;
+                remText.className = 'text-red-600 font-black';
+                weightBar.className = 'h-full bg-red-600 transition-all duration-300';
+                document.getElementById('overweight-warning').style.display = 'flex';
+            } else {
+                remText.innerText = `${weightRem.toLocaleString()} lbs Left`;
+                remText.className = 'text-zinc-500 font-bold';
+                weightBar.className = `h-full transition-all duration-300 ${weightUtil > 85 ? 'bg-amber-500' : 'bg-sunbelt'}`;
+                document.getElementById('overweight-warning').style.display = 'none';
+            }
+
+            // Length Calculations
+            const currentLenFt = maxRightPx / PIXELS_PER_FOOT;
+            const lengthUtil = Math.min((currentLenFt / activeCarrier.length) * 100, 100);
+            const lengthRem = activeCarrier.length - currentLenFt;
+            const isOverlength = currentLenFt > activeCarrier.length;
+
+            document.getElementById('current-length').innerText = currentLenFt.toFixed(1);
+            const lengthBar = document.getElementById('length-bar');
+            lengthBar.style.width = lengthUtil + '%';
+            document.getElementById('length-utilization-text').innerText = `${lengthUtil.toFixed(1)}% Space`;
+            const lengthRemText = document.getElementById('length-remaining-text');
+
+            if (isOverlength) {
+                lengthRemText.innerText = `${Math.abs(lengthRem).toFixed(1)} ft OVER`;
+                lengthRemText.className = 'text-red-600 font-black';
+                lengthBar.className = 'h-full bg-red-600 transition-all duration-300';
+                document.getElementById('overlength-warning').style.display = 'flex';
+            } else {
+                lengthRemText.innerText = `${lengthRem.toFixed(1)} ft Left`;
+                lengthRemText.className = 'text-zinc-500 font-bold';
+                lengthBar.className = `h-full transition-all duration-300 ${lengthUtil > 85 ? 'bg-amber-500' : 'bg-sunbelt'}`;
+                document.getElementById('overlength-warning').style.display = 'none';
+            }
+        }
+
+        window.onload = initApp;
+    </script>
+</body>
+</html>
